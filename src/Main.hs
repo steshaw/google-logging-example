@@ -4,6 +4,7 @@ module Main where
 
 import Control.Lens
 import Control.Exception
+import Control.Monad
 import Data.Text (Text)
 import Network.Google as Google
 import Network.Google.Auth
@@ -18,13 +19,14 @@ import qualified Data.HashMap.Lazy as HM
 import qualified Data.Text as T
 import qualified System.Environment as Env
 
+import qualified Network.Google.Compute.Metadata as Metadata
+
 pprint :: Show a => a -> IO ()
 pprint =
   putStrLn . hscolour TTY defaultColourPrefs False False "" False . ppShow
 
-getEnv :: IO String
+getEnv :: IO (Text, Text, Text, Text, Text)
 getEnv = do
-  -- manager <- newManager tlsManagerSettings
   -- FIXME: Need to ask the environment what our project-id etc is for logging.
   --
   -- Name of log should be something like:
@@ -55,11 +57,24 @@ getEnv = do
   --   container.googleapis.com/stream:  "stdout"
   -- }
   --
-  let resource = "a-resource"
-  return resource
+  manager <- newManager tlsManagerSettings
+  projectId <- Metadata.getProjectId manager
+  description <- Metadata.getDescription manager
+  hostname <- Metadata.getHostname manager
+  instanceId <- Metadata.getInstanceId manager
+  zone <- Metadata.getZone manager
+  return (projectId, description, hostname, instanceId, zone)
 
-logMsg :: Text -> Text -> Text -> Text -> IO (Rs EntriesWrite)
-logMsg clusterName namespace logName msg = do
+logMsg :: Bool -> Text -> Text -> Text -> Text -> IO (Rs EntriesWrite)
+logMsg useEnv clusterName namespace logName msg = do
+  when useEnv $ do
+    (projectId, description, hostname, instanceId, zone) <- getEnv
+    print ("projectId" :: Text, projectId)
+    print ("description" :: Text, description)
+    print ("hostname" :: Text, hostname)
+    print ("instanceId" :: Text, instanceId)
+    print ("zone" :: Text, zone)
+
   lgr <- newLogger Google.Debug stdout
   env <- newEnv <&> (envLogger .~ lgr) . (envScopes .~ loggingWriteScope)
 
@@ -103,9 +118,9 @@ main :: IO ()
 main = do
   args <- Env.getArgs
   case args of
-    [clusterName, namespace, logName, msg] ->
+    [env, clusterName, namespace, logName, msg] ->
       handle (\e -> pprint ("exception" :: Text, e :: SomeException)) $ do
         putStrLn "Writing log message..."
-        result <- logMsg (T.pack clusterName) (T.pack namespace) (T.pack logName) (T.pack msg)
+        result <- logMsg (env == "yes") (T.pack clusterName) (T.pack namespace) (T.pack logName) (T.pack msg)
         pprint ("result" :: Text, result)
-    _ -> putStrLn "usage: google-log cluster-name namespace log-name message"
+    _ -> putStrLn "usage: google-log env cluster-name namespace log-name message"
