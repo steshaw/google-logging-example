@@ -2,10 +2,11 @@
 
 module Main where
 
-import Control.Lens ((&), (.~), (<&>), (?~))
+import Control.Lens
 import Control.Exception
 import Data.Text (Text)
 import Network.Google as Google
+import Network.Google.Auth
 import Network.Google.Logging
 import System.IO (stdout)
 
@@ -61,6 +62,16 @@ logMsg :: Text -> Text -> Text -> Text -> IO (Rs EntriesWrite)
 logMsg clusterName namespace logName msg = do
   lgr <- newLogger Google.Debug stdout
   env <- newEnv <&> (envLogger .~ lgr) . (envScopes .~ loggingWriteScope)
+
+  -- Try to pull out credentials to see what they've been set to.
+  let store = view envStore env
+  auth <- retrieveAuthFromStore store
+  let credentials = _credentials auth
+  case credentials of
+    FromMetadata serviceId -> print ("FromMetadata" :: Text, serviceId)
+    FromClient _a _b -> print ("FromClient" :: Text)
+    FromAccount serviceAccount -> print ("FromAccount" :: Text, serviceAccount)
+    FromUser user -> print ("FromUser" :: Text, user)
 
   let
     entry = logEntry & leTextPayload ?~ msg
