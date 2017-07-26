@@ -7,3 +7,15 @@ extra-deps:
   - gogol-0.3.0
   - gogol-core-0.3.0
   - gogol-logging-0.3.0
+
+image:
+  container:
+    base: "fpco/ubuntu-with-libgmp:14.04"
+#    name: "fpco/hello-world"
+#    add:
+#      man/: /usr/local/share/man/
+    # OPTIONALLY SPECIFY A LIST OF EXECUTABLES. STACK WILL CREATE
+    # A TAGGED IMAGE FOR EACH IN THE LIST. THESE IMAGES WILL HAVE
+    # THEIR RESPECTIVE "ENTRYPOINT" SET.
+#    entrypoints:
+#      - stack
