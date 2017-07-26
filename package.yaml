@@ -21,6 +21,7 @@ dependencies:
   - lens
   - pretty-show
   - text
+  - unordered-containers
 
 executables:
   google-log:

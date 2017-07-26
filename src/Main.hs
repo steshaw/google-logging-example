@@ -13,6 +13,7 @@ import Language.Haskell.HsColour
 import Language.Haskell.HsColour.Colourise
 import Text.Show.Pretty (ppShow)
 
+import qualified Data.HashMap.Lazy as HM
 import qualified Data.Text as T
 import qualified System.Environment as Env
 
@@ -28,7 +29,7 @@ getEnv = do
   -- Name of log should be something like:
   --   projects/my-project-137423/logs/my-app
   --
-  -- MonitoredResource should contain:
+  -- MonitoredResource should contain to simulate Google's fluentd:
   --   labels: {
   --     cluster_name:  "cluster-1"
   --     container_name:  "my-app"
@@ -38,18 +39,43 @@ getEnv = do
   --     project_id:  "my-project-137423"
   --     zone:  "us-central1-a"
   --   }
+  --
+  -- Entry labels should look something like:
+  --
+  -- labels: {
+  --   compute.googleapis.com/resource_id:  "7937682100289506354"
+  --   compute.googleapis.com/resource_name:  "fluentd-cloud-logging-gke-my-cluster-1-default-pool-dabd30fd-wv"
+  --   compute.googleapis.com/resource_type:  "instance"
+  --   container.googleapis.com/cluster_name:  "my-cluster-1"
+  --   container.googleapis.com/container_name:  "my-app"
+  --   container.googleapis.com/instance_id:  "7937682100289506354"
+  --   container.googleapis.com/namespace_name:  "default"
+  --   container.googleapis.com/pod_name:  "my-app-3144516956-msvv1"
+  --   container.googleapis.com/stream:  "stdout"
+  -- }
+  --
   let resource = "a-resource"
   return resource
 
-logMsg :: Text -> Text -> IO (Rs EntriesWrite)
-logMsg logName msg = do
+logMsg :: Text -> Text -> Text -> Text -> IO (Rs EntriesWrite)
+logMsg clusterName namespace logName msg = do
   lgr <- newLogger Google.Debug stdout
   env <- newEnv <&> (envLogger .~ lgr) . (envScopes .~ loggingWriteScope)
 
   let
     entry = logEntry & leTextPayload ?~ msg
     entries = [entry]
-    resource = monitoredResource & mrType ?~ "container"
+    resourceLabels = monitoredResourceLabels $ HM.fromList
+      [ ("cluster_name", clusterName)
+      , ("namespace_id", namespace)
+      ]
+    resource = monitoredResource
+      & mrType ?~ "container"
+      & mrLabels ?~ resourceLabels
+    labels = writeLogEntriesRequestLabels $ HM.fromList
+      [ ("container.googleapis.com/cluster_name", clusterName)
+      , ("container.googleapis.com/namespace_name", namespace)
+      ]
 
   runResourceT . runGoogle env $
     send
@@ -58,7 +84,7 @@ logMsg logName msg = do
           & wlerEntries .~ entries
           & wlerLogName ?~ logName
           & wlerResource ?~ resource
---        & wlerLabels .~ labels
+          & wlerLabels ?~ labels
         )
       )
 
@@ -66,9 +92,9 @@ main :: IO ()
 main = do
   args <- Env.getArgs
   case args of
-    [logName, msg] ->
+    [clusterName, namespace, logName, msg] ->
       handle (\e -> pprint ("exception" :: Text, e :: SomeException)) $ do
         putStrLn "Writing log message..."
-        result <- logMsg (T.pack logName) (T.pack msg)
+        result <- logMsg (T.pack clusterName) (T.pack namespace) (T.pack logName) (T.pack msg)
         pprint ("result" :: Text, result)
-    _ -> putStrLn "usage: google-log log-name message"
+    _ -> putStrLn "usage: google-log cluster-name namespace log-name message"
