@@ -1,0 +1,9 @@
+resolver: lts-8.23
+
+packages:
+  - '.'
+
+extra-deps:
+  - gogol-0.3.0
+  - gogol-core-0.3.0
+  - gogol-logging-0.3.0

@@ -1,0 +1,28 @@
+name:                google-logging-example
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/steshaw/gcs-upload-example#readme
+license:             BSD2
+author:              Steven Shaw
+maintainer:          steven@steshaw.org
+copyright:           (c) 2017, Steven Shaw
+category:            Example
+extra-source-files:
+  - README.md
+
+ghc-options: -Wall -O
+
+dependencies:
+  - base >= 4.7 && < 5
+  - gogol == 0.3.*
+  - gogol-logging == 0.3.*
+  - hscolour
+  - lens
+  - pretty-show
+  - text
+
+executables:
+  google-log:
+    source-dirs:      src
+    main:             Main.hs
